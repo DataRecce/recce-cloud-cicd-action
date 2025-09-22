@@ -69,16 +69,16 @@ runs:
           pr_number="${{ github.event.number }}"
           response=$(curl -s -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/json" -d '{
             "branch": "'"$branch_name"'",
-            "pr_number": $pr_number,
-            "adapter_type": "'"$adapter_type"'",
-          }' "${{ inputs.api_host }}/api/v2/github/${{ github.repository }}/touch-recce-session" )
+            "pr_number": '"$pr_number"',
+            "adapter_type": "'"$adapter_type"'"
+          }' "${{ inputs.api_host }}/api/v2/github/${{ github.repository }}/touch-recce-session")
         else
           echo "Uploading manifest for base session..."
           branch_name="${{ github.ref_name }}"
           response=$(curl -s -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/json" -d '{
             "branch": "'"$branch_name"'",
-            "adapter_type": "'"$adapter_type"'",
-          }' "${{ inputs.api_host }}/api/v2/github/${{ github.repository }}/touch-recce-session" )
+            "adapter_type": "'"$adapter_type"'"
+          }' "${{ inputs.api_host }}/api/v2/github/${{ github.repository }}/touch-recce-session")
         fi
 
         # Upload the manifest.json file
