@@ -82,9 +82,13 @@ runs:
         fi
 
         # Upload the manifest.json file
+        echo "Uploading manifest.json and catalog.json to Recce Cloud..."
         manifest_upload_url=$(echo "$response" | jq -r '.manifest_upload_url')
         catalog_upload_url=$(echo "$response" | jq -r '.catalog_upload_url')
         session_id=$(echo "$response" | jq -r '.session_id')
+        echo "Session ID: $session_id"
+        echo "Manifest Upload URL: $manifest_upload_url"
+        echo "Catalog Upload URL: $catalog_upload_url"
         if [[ "$manifest_upload_url" == "null" || "$catalog_upload_url" == "null" || "$session_id" == "null" ]]; then
           echo "Error: Failed to get upload URLs or session ID from Recce Cloud."
           echo "### Recce Cloud CI/CD Action Error" >> $GITHUB_STEP_SUMMARY
