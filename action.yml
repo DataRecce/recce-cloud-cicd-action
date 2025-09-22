@@ -114,12 +114,12 @@ runs:
           echo "The base session has been updated." >> $GITHUB_STEP_SUMMARY
         fi
 
-  - name: Comment on pull request
-    if: github.event_name == 'pull_request'
-    uses: thollander/actions-comment-pull-request@v3
-    with:
-      message: |
-        # Recce Cloud Session Uploaded
-        [Launch by Recce Cloud](http://localhost:3000/launch/${{ steps.recce-session-upload.outputs.session_id }})
-      comment-tag: recce-session
-    
+    - name: Comment on pull request
+      if: github.event_name == 'pull_request'
+      uses: thollander/actions-comment-pull-request@v3
+      with:
+        message: |
+          # Recce Cloud Session Uploaded
+          [Launch by Recce Cloud](http://localhost:3000/launch/${{ steps.recce-session-upload.outputs.session_id }})
+        comment-tag: recce-session
+      
