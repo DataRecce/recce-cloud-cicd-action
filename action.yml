@@ -83,6 +83,7 @@ runs:
 
         # Upload the manifest.json file
         echo "Uploading manifest.json and catalog.json to Recce Cloud..."
+        echo "Response from Recce Cloud: $response"
         manifest_upload_url=$(echo "$response" | jq -r '.manifest_upload_url')
         catalog_upload_url=$(echo "$response" | jq -r '.catalog_upload_url')
         session_id=$(echo "$response" | jq -r '.session_id')
