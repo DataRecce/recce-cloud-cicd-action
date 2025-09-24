@@ -120,6 +120,6 @@ runs:
       with:
         message: |
           # Recce Cloud Session Uploaded
-          [Launch by Recce Cloud](http://localhost:3000/launch/${{ steps.recce-session-upload.outputs.session_id }})
+          [Launch by Recce Cloud](${{ inputs.web_host }}/launch/${{ steps.recce-session-upload.outputs.session_id }})
         comment-tag: recce-session
       
