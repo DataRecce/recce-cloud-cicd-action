@@ -80,7 +80,7 @@ runs:
         response_body=$(echo "$response" | sed -E 's/HTTPSTATUS:[0-9]*$//')
 
         if [ "$http_code" -ne 200 ]; then
-          echo "[Error] Failed to create or retrieve Recce session. HTTP Status: $http_code"
+          echo "Error: Failed to create or retrieve Recce session. HTTP Status: $http_code"
           echo "Response: $response_body"
           echo "### Recce Cloud CI/CD Action Error" >> $GITHUB_STEP_SUMMARY
           echo "Failed to create or retrieve Recce session. Please check your GitHub repository integration settings." >> $GITHUB_STEP_SUMMARY
@@ -95,7 +95,7 @@ runs:
         echo "Manifest Upload URL: $manifest_upload_url"
         echo "Catalog Upload URL: $catalog_upload_url"
         if [[ "$manifest_upload_url" == "null" || "$catalog_upload_url" == "null" || "$session_id" == "null" ]]; then
-          echo "[Error] Failed to get upload URLs or session ID from Recce Cloud."
+          echo "Error: Failed to get upload URLs or session ID from Recce Cloud."
           echo "### Recce Cloud CI/CD Action Error" >> $GITHUB_STEP_SUMMARY
           echo "Failed to get upload URLs or session ID from Recce Cloud. Please check your Recce token and repository integration settings." >> $GITHUB_STEP_SUMMARY
           exit 1
