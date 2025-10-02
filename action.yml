@@ -103,6 +103,9 @@ runs:
         curl -s -X PUT --upload-file "${{ inputs.dbt_target_path }}/manifest.json" "$manifest_upload_url"
         curl -s -X PUT --upload-file "${{ inputs.dbt_target_path }}/catalog.json" "$catalog_upload_url"
         echo "[Done] Artifacts uploaded to Recce Cloud."
+        curl -s -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/json" -d '{
+          "session_id": "'"$session_id"'"
+        }' "${{ inputs.api_host }}/api/v2/github/${{ github.repository }}/upload-completed")
 
         if [[ "${{ github.event_name }}" == "pull_request" ]]; then
           echo "### Recce Cloud CI/CD Action Info" >> $GITHUB_STEP_SUMMARY
