@@ -1,68 +1,138 @@
 # Recce Cloud CI/CD Action
 
-A GitHub Action to integrate Recce Cloud CI/CD from your GitHub repository, built with **TypeScript** for enhanced type safety and developer experience.
+A GitHub Action to integrate Recce Cloud into your CI/CD pipeline, automatically uploading DBT artifacts for data quality checks and lineage analysis.
 
 [![Build Status](https://img.shields.io/github/actions/workflow/status/DataRecce/recce-cloud-cicd-action/test.yml?branch=main)](https://github.com/DataRecce/recce-cloud-cicd-action/actions)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 ## 🎯 Features
 
-- ✅ **Type-Safe**: Full TypeScript implementation with strict type checking
+- ✅ **Automated DBT Integration**: Seamlessly upload DBT manifest and catalog files
+- ✅ **Pull Request Sessions**: Automatic session creation for PR reviews
+- ✅ **Base Branch Tracking**: Keep your base branch up-to-date in Recce Cloud
 - ✅ **Reliable**: Built-in retry logic and comprehensive error handling
-- ✅ **Tested**: 85%+ test coverage with Jest and ts-jest
-- ✅ **Fast**: 10-30% faster than shell script version
-- ✅ **Compatible**: 100% backward compatible with v1
-- ✅ **Developer-Friendly**: Excellent IDE support with IntelliSense
-- ✅ **Maintainable**: Clean, modular code with TypeScript interfaces
+- ✅ **Easy Setup**: Simple configuration with sensible defaults
 
 ## 📦 Prerequisites
 
 1. **Recce Cloud Account**: Sign up at [Recce Cloud](https://cloud.datarecce.io)
-2. **GitHub Repository Integration**: Install the Recce Cloud GitHub App
-3. **DBT Project**: Your workflow must build DBT artifacts before using this action
+2. **GitHub Repository Integration**: Install the Recce Cloud GitHub App from your repository settings
+3. **DBT Project**: Your workflow must build DBT artifacts (`manifest.json` and `catalog.json`) before using this action
 
 ## 🚀 Usage
 
 ### Basic Example
 
+We recommend setting up two separate workflows: one for the base branch and one for pull requests.
+
+#### Base Pipeline (main branch)
+
 ```yaml
-name: Recce Cloud CI/CD
+name: Update Base Recce Session
 
 on:
-  pull_request:
-    branches: [main]
   push:
-    branches: [main]
+    branches: ["main"]
+  schedule:
+    - cron: "0 2 * * *" # Daily at 2 AM UTC
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
 
 jobs:
-  recce-cicd:
+  update-base-session:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
+          cache: "pip"
 
-      - name: Install and build DBT
+      - name: Install dependencies
         run: |
-          pip install dbt-core dbt-postgres
-          dbt deps
-          dbt build
-          dbt docs generate
+          pip install -r requirements.txt
 
-      - name: Upload to Recce Cloud
-        uses: DataRecce/recce-cloud-cicd-action@v1
-        with:
-          dbt_target_path: 'target'
+      - name: Prepare dbt artifacts
+        run: |
+          # Install dbt packages
+          dbt deps
+
+          # Optional: Build tables to ensure they're materialized and updated
+          # dbt build --target prod
+
+          # Required: Generate artifacts (provides all we need)
+          dbt docs generate --target prod
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          DBT_ENV_SECRET_KEY: ${{ secrets.DBT_ENV_SECRET_KEY }}
+
+      - name: Update Recce Cloud Base Session
+        uses: DataRecce/recce-cloud-cicd-action@v1
+```
+
+
+#### PR Pipeline
+
+```yaml
+name: Validate PR Changes
+
+on:
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      # Step 1: Prepare current branch artifacts
+      - name: Build current branch artifacts
+        run: |
+          # Install dbt packages
+          dbt deps
+
+          # Optional: Build tables to ensure they're materialized
+          # dbt build --target ci
+
+          # Required: Generate artifacts for comparison
+          dbt docs generate --target ci
+        env:
+          DBT_ENV_SECRET_KEY: ${{ secrets.DBT_ENV_SECRET_KEY }}
+
+      - name: Update Recce PR Session
+        uses: DataRecce/recce-cloud-cicd-action@v1
 ```
 
 ### Advanced Example
+
+#### Custom Configuration
 
 ```yaml
 - name: Upload to Recce Cloud
@@ -70,210 +140,82 @@ jobs:
   with:
     dbt_target_path: 'custom-target'
     base_branch: 'develop'
-    api_host: 'https://cloud.datarecce.io'
-    web_host: 'https://cloud.datarecce.io'
   env:
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
-
-### With Custom PR Comment
-
-```yaml
-- name: Upload to Recce Cloud
-  id: recce
-  uses: DataRecce/recce-cloud-cicd-action@v1
-  with:
-    dbt_target_path: 'target'
-  env:
-    GITHUB_TOKEN: ${{ github.token }}
 ```
 
 ## 📋 Inputs
 
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
-| `dbt_target_path` | Path to DBT target directory with manifest.json and catalog.json | Yes | `target` |
+| `dbt_target_path` | Path to DBT target directory with manifest.json and catalog.json | No | `target` |
 | `base_branch` | Base branch for deployment | No | `main` |
-| `api_host` | Recce Cloud API host URL | No | `https://cloud.datarecce.io` |
-| `web_host` | Recce Cloud web host URL | No | `https://cloud.datarecce.io` |
 | `github_token` | GitHub authentication token | No | `${{ github.token }}` |
 
 ## 📤 Outputs
 
 | Output | Description | Available |
 |--------|-------------|-----------|
-| `session_id` | Recce Cloud session ID | Pull requests only |
+| `session_id` | Recce Cloud session ID for accessing the review session | Pull requests only |
 
-## 🏗️ TypeScript Architecture
+## ❓ How It Works
 
-### Type Definitions
+1. **Pull Request Events**: When a PR is opened or updated, the action creates a new Recce Cloud session with your current branch's DBT artifacts
+2. **Push to Base Branch**: When changes are pushed to your base branch (e.g., `main`), the action updates the base session for comparison
+3. **Session Link**: For PRs, a session link is automatically added to the GitHub Actions summary, allowing your team to review changes in Recce Cloud
 
-```typescript
-interface ActionInputs {
-  dbt_target_path: string;
-  api_host: string;
-  web_host: string;
-  github_token: string;
-  base_branch: string;
-}
+## 🔧 Troubleshooting
 
-interface TouchSessionResponse {
-  session_id: string;
-  manifest_upload_url: string;
-  catalog_upload_url: string;
-}
+### Missing DBT Artifacts
 
-interface DbtManifest {
-  metadata: {
-    adapter_type: string;
-    dbt_version: string;
-  };
-  nodes?: Record<string, unknown>;
-}
+**Error**: `DBT manifest.json file not found`
+
+**Solution**: Ensure your workflow builds DBT artifacts before running this action:
+
+```yaml
+- name: Build DBT artifacts
+  run: |
+    dbt deps
+    dbt build
+    dbt docs generate  # This generates catalog.json
 ```
 
-### Project Structure
+### Authentication Issues
 
-```
-src/
-├── index.ts           # Entry point
-├── main.ts            # Core implementation with type safety
-├── types.ts           # TypeScript interfaces and types
-└── main.test.ts       # Jest tests with TypeScript
-```
+**Error**: `Failed to create or retrieve Recce session`
 
-## 🔨 Development
+**Solution**:
+1. Verify the Recce Cloud GitHub App is installed on your repository
+2. Ensure `GITHUB_TOKEN` has proper permissions in your workflow
+3. Check that your repository is connected to Recce Cloud
 
-### Setup
+### Custom Target Path
 
-```bash
-# Install dependencies
-npm install
+If your DBT project uses a custom target directory:
 
-# Run tests
-npm test
-
-# Run tests with coverage
-npm test -- --coverage
-
-# Lint TypeScript code
-npm run lint
-
-# Format code with Prettier
-npm run format
-
-# Build the action
-npm run build
-
-# Run all checks (format, lint, test, build)
-npm run all
-```
-
-### Type Checking
-
-```bash
-# Check types without emitting files
-npx tsc --noEmit
-
-# Watch mode for development
-npx tsc --noEmit --watch
-```
-
-### Building
-
-The action uses [@vercel/ncc](https://github.com/vercel/ncc) to compile TypeScript and bundle all dependencies:
-
-```bash
-npm run build
-# Creates dist/index.js
-```
-
-**Important**: The `dist/` directory must be committed to the repository!
-
-## 🧪 Testing
-
-### Run Tests
-
-```bash
-# Run all tests
-npm test
-
-# Run tests in watch mode
-npm test -- --watch
-
-# Run with coverage
-npm test -- --coverage
-
-# Run specific test file
-npm test -- main.test.ts
-```
-
-## 🚨 Troubleshooting
-
-### Type Errors
-
-```bash
-# Check for type errors
-npx tsc --noEmit
-
-# Common fixes:
-# 1. Add type annotations
-# 2. Update tsconfig.json
-# 3. Install @types packages
-```
-
-### Build Errors
-
-```bash
-# Clear build cache
-rm -rf dist/ lib/ node_modules/
-npm install
-npm run build
-```
-
-### Test Failures
-
-```bash
-# Run tests with verbose output
-npm test -- --verbose
-
-# Clear Jest cache
-npx jest --clearCache
-npm test
+```yaml
+- name: Upload to Recce Cloud
+  uses: DataRecce/recce-cloud-cicd-action@v1
+  with:
+    dbt_target_path: 'path/to/your/target'
 ```
 
 ## 📚 Additional Resources
 
-- [TypeScript Handbook](https://www.typescriptlang.org/docs/handbook/intro.html)
-- [GitHub Actions TypeScript Template](https://github.com/actions/typescript-action)
-- [Jest with TypeScript](https://jestjs.io/docs/getting-started#using-typescript)
-- [Recce Documentation](https://docs.datarecce.io)
+- [Recce Documentation](https://docs.reccehq.com)
+- [Getting Started with Recce Cloud](https://docs.reccehq.com/2-getting-started/start-free-with-cloud/)
+- [DBT Documentation](https://docs.getdbt.com/)
 
-## 🤝 Contributing
+## 💬 Support
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+Need help? We're here for you!
 
-### Development Workflow
-
-1. Fork the repository
-2. Create a feature branch
-3. Write TypeScript code with types
-4. Add tests
-5. Run `npm run all`
-6. Submit a pull request
+- 💬 **Discord**: Join our community at https://discord.com/invite/VpwXRC34jz
+- 📧 **Email**: dev@reccehq.com
+- � **Issues**: Report bugs at https://github.com/DataRecce/recce-cloud-cicd-action/issues
+- 📖 **Documentation**: https://docs.reccehq.com
 
 ## 📄 License
 
 Apache-2.0 - see [LICENSE](LICENSE) file for details
 
-## 💬 Support
-
-- 📧 **Email**: dev@reccehq.com
-- 💬 **Discord**: https://discord.com/invite/VpwXRC34jz
-- 🐛 **Issues**: https://github.com/DataRecce/recce-cloud-cicd-action/issues
-- 📖 **Docs**: https://docs.reccehq.com
-
-
----
-
-**Built with ❤️ using TypeScript**
