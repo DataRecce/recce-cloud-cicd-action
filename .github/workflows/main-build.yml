@@ -62,14 +62,16 @@ jobs:
             echo "ℹ️  No changes in build artifacts"
           fi
 
+      - name: Git add build artifacts
+        if: steps.check-changes.outputs.changes == 'true'
+        run: git add dist/
+
       - name: Commit and push build artifacts
         if: steps.check-changes.outputs.changes == 'true'
-        run: |
-          git config --local user.email "dev@reccehq.com"
-          git config --local user.name "Recce GitHub Action Bot"
-          git add dist/
-          git commit -m "chore: update build artifacts [skip ci]"
-          git push
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "chore: update build artifacts [skip ci]"
+          branch: ${{ github.base_ref || github.ref_name }}
 
       - name: Create build summary
         if: always()
