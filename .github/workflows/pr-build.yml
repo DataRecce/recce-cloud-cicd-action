@@ -1,0 +1,191 @@
+name: PR Build and Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    types: [opened, synchronize, reopened]
+    # Optional: Only trigger on specific file changes
+    paths:
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+      - "!**.md"
+      - "!docs/**"
+
+# Cancel in-progress builds when new commits are pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      # Cache node_modules for faster builds
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Record build start time
+      - name: Record build start time
+        id: build-start
+        run: echo "start_time=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Run build
+        id: build
+        run: npm run build
+
+      # Record build end time and calculate duration
+      - name: Calculate build duration
+        id: build-duration
+        if: always()
+        run: |
+          end_time=$(date +%s)
+          start_time=${{ steps.build-start.outputs.start_time }}
+          duration=$((end_time - start_time))
+          echo "duration=${duration}s" >> $GITHUB_OUTPUT
+
+      # Optional: Run linting
+      - name: Run linter
+        if: success()
+        run: npm run lint
+        continue-on-error: false
+
+      # Optional: Run tests
+      - name: Run tests
+        if: success()
+        run: npm test
+        continue-on-error: false
+
+      # Optional: Run format checking (for TypeScript projects)
+      - name: Format check
+        if: success()
+        run: npm run format-check
+        continue-on-error: true
+
+      # Upload build artifacts
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ github.event.pull_request.number }}-${{ github.sha }}
+          path: |
+            dist/
+            build/
+          retention-days: 7
+          if-no-files-found: warn
+
+      # Generate build summary
+      - name: Generate build summary
+        if: always()
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Duration**: ${{ steps.build-duration.outputs.duration }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: \`${{ github.event.pull_request.head.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Node Version**: 20" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ All checks passed successfully!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Build failed. Please check the logs above." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # Comment on PR with build status
+      - name: Comment on PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const sha = '${{ github.event.pull_request.head.sha }}';
+            const runId = '${{ github.run_id }}';
+            const duration = '${{ steps.build-duration.outputs.duration }}';
+            const prNumber = context.issue.number;
+
+            const statusEmoji = status === 'success' ? '✅' : '❌';
+            const statusText = status === 'success' ? 'succeeded' : 'failed';
+
+            const body = `${statusEmoji} **Build ${statusText}** for commit \`${sha.substring(0, 7)}\`
+
+            **Build Details:**
+            - **Status**: ${status}
+            - **Duration**: ${duration}
+            - **Commit**: ${sha.substring(0, 7)}
+            - **PR**: #${prNumber}
+            - **Logs**: [View full logs](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId})
+
+            ${status === 'success' ? '✨ Build artifacts are ready for review!' : '⚠️ Please fix the build errors and push your changes.'}
+            `;
+
+            // Find existing bot comments
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            const botComment = comments.data.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('Build Details:')
+            );
+
+            // Update existing comment or create new one
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: body
+              });
+            }
+
+      # Set PR status check
+      - name: Set status check
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}' === 'success' ? 'success' : 'failure';
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: '${{ github.event.pull_request.head.sha }}',
+              state: status,
+              target_url: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}',
+              description: status === 'success' ? 'Build passed' : 'Build failed',
+              context: 'PR Build'
+            });
