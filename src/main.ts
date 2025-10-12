@@ -99,7 +99,7 @@ async function uploadFile(
     'Content-Type': 'application/json'
   });
 
-  if (response.message.statusCode !== 200) {
+  if (response.message.statusCode !== 204) {
     throw new Error(`Failed to upload file: ${filePath}. Status: ${response.message.statusCode}`);
   }
 }

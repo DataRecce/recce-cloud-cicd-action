@@ -31,6 +31,7 @@ inputs:
 
   github_token:
     description: 'GitHub token for authentication (defaults to github.token if not provided).'
+    default: ${{ github.token }}
     required: false
 
 outputs:
