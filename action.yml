@@ -1,6 +1,6 @@
 name: 'Recce Cloud CI/CD Action'
 
-description: 'A GitHub Action to integrate Recce Cloud CI/CD from your GitHub repository.'
+description: 'A GitHub Action to integrate Recce Cloud CI/CD from your GitHub repository (TypeScript version).'
 
 author: 'Recce Team'
 
@@ -22,107 +22,22 @@ inputs:
   api_host:
     description: 'The Recce Cloud API host URL.'
     required: false
-    default: 'https://cloud.datarecce.io' 
+    default: 'https://cloud.datarecce.io'
 
   web_host:
     description: 'The Recce Cloud web host URL.'
     required: false
     default: 'https://cloud.datarecce.io'
 
+  github_token:
+    description: 'GitHub token for authentication (defaults to github.token if not provided).'
+    default: ${{ github.token }}
+    required: false
+
+outputs:
+  session_id:
+    description: 'The Recce Cloud session ID for the uploaded artifacts'
+
 runs:
-  using: "composite"
-  steps:
-    - name: 'Verify DBT manifest files'
-      shell: bash
-      run: |
-        echo "[Verify] DBT manifest files in '${{ inputs.dbt_target_path }}' directory..."
-        if [[ ! -f "${{ inputs.dbt_target_path }}/manifest.json" ]]; then
-          echo "[Error] DBT manifest.json file not found in ${{ inputs.dbt_target_path }} directory."
-          echo "### Recce Cloud CI/CD Action Error ###\nThe DBT `manifest.json` file is missing. Please ensure that your DBT project has been built and the manifest.json file is present in the specified target directory.\n### End of Error ###" >> $GITHUB_STEP_SUMMARY
-          exit 1
-        fi
-        if [[ ! -f "${{ inputs.dbt_target_path }}/catalog.json" ]]; then
-          echo "[Error] DBT catalog.json file not found in ${{ inputs.dbt_target_path }} directory."
-          echo "### Recce Cloud CI/CD Action Error ###\nThe DBT `catalog.json` file is missing. Please ensure that your DBT project has been built and the catalog.json file is present in the specified target directory.\n### End of Error ###" >> $GITHUB_STEP_SUMMARY
-          exit 1
-        fi
-        echo "[Done] DBT manifest files verified."
-
-    - name: 'Upload DBT Artifacts to Recce Cloud Session'
-      id: recce-session-upload
-      shell: bash
-      env:
-        GITHUB_TOKEN: ${{ github.token }}  # Must explicitly set this
-      run: |
-        adapter_type=$(cat ${{ inputs.dbt_target_path }}/manifest.json | jq -r '.metadata.adapter_type')
-
-        # Get the presigned URLs for uploading the manifest files
-        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-          echo "[Upload] Artifacts for Pull Request session..."
-          branch_name="${{ github.head_ref }}"
-          pr_number="${{ github.event.number }}"
-          response=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/json" -d '{
-            "branch": "'"$branch_name"'",
-            "pr_number": '"$pr_number"',
-            "adapter_type": "'"$adapter_type"'"
-          }' "${{ inputs.api_host }}/api/v2/github/${{ github.repository }}/touch-recce-session")
-        else
-          echo "[Upload] Artifacts for base session..."
-          branch_name="${{ github.ref_name }}"
-          response=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/json" -d '{
-            "branch": "'"$branch_name"'",
-            "adapter_type": "'"$adapter_type"'"
-          }' "${{ inputs.api_host }}/api/v2/github/${{ github.repository }}/touch-recce-session")
-        fi
-
-        # Extract status code and response body
-        http_code=$(echo "$response" | grep -o 'HTTPSTATUS:[0-9]*' | cut -d: -f2)
-        response_body=$(echo "$response" | sed -E 's/HTTPSTATUS:[0-9]*$//')
-
-        if [ "$http_code" -ne 200 ]; then
-          echo "Error: Failed to create or retrieve Recce session. HTTP Status: $http_code"
-          echo "Response: $response_body"
-          echo "### Recce Cloud CI/CD Action Error" >> $GITHUB_STEP_SUMMARY
-          echo "Failed to create or retrieve Recce session. Please check your GitHub repository integration settings." >> $GITHUB_STEP_SUMMARY
-          exit 1
-        fi
-
-        # Upload the manifest.json file
-        echo "[Uploading] manifest.json and catalog.json to Recce Cloud..."
-        manifest_upload_url=$(echo "$response_body" | jq -r '.manifest_upload_url')
-        catalog_upload_url=$(echo "$response_body" | jq -r '.catalog_upload_url')
-        session_id=$(echo "$response_body" | jq -r '.session_id')
-        echo "Manifest Upload URL: $manifest_upload_url"
-        echo "Catalog Upload URL: $catalog_upload_url"
-        if [[ "$manifest_upload_url" == "null" || "$catalog_upload_url" == "null" || "$session_id" == "null" ]]; then
-          echo "Error: Failed to get upload URLs or session ID from Recce Cloud."
-          echo "### Recce Cloud CI/CD Action Error" >> $GITHUB_STEP_SUMMARY
-          echo "Failed to get upload URLs or session ID from Recce Cloud. Please check your Recce token and repository integration settings." >> $GITHUB_STEP_SUMMARY
-          exit 1
-        fi
-        curl -s -X PUT --upload-file "${{ inputs.dbt_target_path }}/manifest.json" "$manifest_upload_url"
-        curl -s -X PUT --upload-file "${{ inputs.dbt_target_path }}/catalog.json" "$catalog_upload_url"
-        echo "[Done] Artifacts uploaded to Recce Cloud."
-        curl -s -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/json" -d '{
-          "session_id": "'"$session_id"'"
-        }' "${{ inputs.api_host }}/api/v2/github/${{ github.repository }}/upload-completed"
-
-        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-          echo "### Recce Cloud CI/CD Action Info" >> $GITHUB_STEP_SUMMARY
-          echo "Please use the link below to launch your Recce Cloud session." >> $GITHUB_STEP_SUMMARY
-          echo "[Launch Recce Cloud Session](${{ inputs.web_host }}/launch/$session_id)" >> $GITHUB_STEP_SUMMARY
-          echo "session_id=$session_id" >> $GITHUB_OUTPUT
-        else
-          echo "### Recce Cloud CI/CD Action Info" >> $GITHUB_STEP_SUMMARY
-          echo "The base session has been updated." >> $GITHUB_STEP_SUMMARY
-        fi
-
-    - name: Comment on pull request
-      if: github.event_name == 'pull_request'
-      uses: thollander/actions-comment-pull-request@v3
-      with:
-        message: |
-          # Recce Cloud Session Uploaded
-          [Launch by Recce Cloud](${{ inputs.web_host }}/launch/${{ steps.recce-session-upload.outputs.session_id }})
-        comment-tag: recce-session
-      
+  using: 'node20'
+  main: 'dist/index.js'
