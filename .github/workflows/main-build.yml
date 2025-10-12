@@ -71,7 +71,7 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: "chore: update build artifacts [skip ci]"
-          branch: ${{ github.base_ref || github.ref_name }}
+          branch: main
 
       - name: Create build summary
         if: always()
