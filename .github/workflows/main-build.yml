@@ -24,7 +24,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.AUTOCOMMIT_PERSONAL_TOKEN }}
           fetch-depth: 0
 
       - name: Setup Node.js
@@ -71,7 +71,8 @@ jobs:
         if: steps.check-changes.outputs.changes == 'true'
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          commit_message: "chore: update build artifacts [skip ci]"
+          commit_message: "AUTO-COMMIT - update build artifacts [skip ci]"
+          commit_user_name: "Recce GitHub Action Bot"
           branch: main
 
       - name: Create build summary
