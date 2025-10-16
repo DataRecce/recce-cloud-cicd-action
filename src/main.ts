@@ -95,9 +95,8 @@ async function uploadFile(
 ): Promise<void> {
   const fileContent = await fs.readFile(filePath, 'utf8');
 
-  const response = await httpClient.put(uploadUrl, fileContent, {
-    'Content-Type': 'application/json'
-  });
+  // Content-Type is not required for presigned URL uploads, AWS will reject the PUT request if provided content-type
+  const response = await httpClient.put(uploadUrl, fileContent, {});
 
   if (response.message.statusCode !== 204) {
     throw new Error(`Failed to upload file: ${filePath}. Status: ${response.message.statusCode}`);
