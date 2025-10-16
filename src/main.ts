@@ -99,7 +99,11 @@ async function uploadFile(
   // Adding headers not in the signature (like Content-Type) will cause a signature mismatch, but omitting required ones will also fail.
   const response = await httpClient.put(uploadUrl, fileContent, {});
 
-  if (response.message.statusCode == null || response.message.statusCode < 200 || response.message.statusCode >= 300) {
+  if (
+    response.message.statusCode == null ||
+    response.message.statusCode < 200 ||
+    response.message.statusCode >= 300
+  ) {
     throw new Error(`Failed to upload file: ${filePath}. Status: ${response.message.statusCode}`);
   }
 }
