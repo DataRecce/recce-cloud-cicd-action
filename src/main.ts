@@ -95,11 +95,15 @@ async function uploadFile(
 ): Promise<void> {
   const fileContent = await fs.readFile(filePath, 'utf8');
 
-  const response = await httpClient.put(uploadUrl, fileContent, {
-    'Content-Type': 'application/json'
-  });
+  // For presigned S3 URL uploads, you must include exactly the headers used when signing the URL.
+  // Adding headers not in the signature (like Content-Type) will cause a signature mismatch, but omitting required ones will also fail.
+  const response = await httpClient.put(uploadUrl, fileContent, {});
 
-  if (response.message.statusCode !== 204) {
+  if (
+    response.message.statusCode == null ||
+    response.message.statusCode < 200 ||
+    response.message.statusCode >= 300
+  ) {
     throw new Error(`Failed to upload file: ${filePath}. Status: ${response.message.statusCode}`);
   }
 }
