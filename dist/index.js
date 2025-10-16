@@ -30033,10 +30033,12 @@ async function getAdapterType(dbtTargetPath) {
  */
 async function uploadFile(httpClient, filePath, uploadUrl) {
     const fileContent = await fs_1.promises.readFile(filePath, 'utf8');
-    const response = await httpClient.put(uploadUrl, fileContent, {
-        'Content-Type': 'application/json'
-    });
-    if (response.message.statusCode !== 204) {
+    // For presigned S3 URL uploads, you must include exactly the headers used when signing the URL.
+    // Adding headers not in the signature (like Content-Type) will cause a signature mismatch, but omitting required ones will also fail.
+    const response = await httpClient.put(uploadUrl, fileContent, {});
+    if (response.message.statusCode == null ||
+        response.message.statusCode < 200 ||
+        response.message.statusCode >= 300) {
         throw new Error(`Failed to upload file: ${filePath}. Status: ${response.message.statusCode}`);
     }
 }
