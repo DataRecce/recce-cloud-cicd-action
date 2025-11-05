@@ -255,7 +255,11 @@ async function uploadDbtArtifacts(inputs: ActionInputs): Promise<string | undefi
 
   // Notify upload completion
   const uploadCompletedUrl = `${inputs.api_host}/api/v2/github/${repository}/upload-completed`;
-  const uploadCompletedBody: UploadCompletedRequest = { session_id };
+  const enableAiSummary = inputs.enable_ai_summary === 'true';
+  const uploadCompletedBody: UploadCompletedRequest = {
+    session_id,
+    enable_ai_summary: enableAiSummary
+  };
 
   await httpClient.postJson(uploadCompletedUrl, uploadCompletedBody, {
     Authorization: `Bearer ${inputs.github_token}`,
@@ -292,6 +296,7 @@ function getInputs(): ActionInputs {
   const apiHost = core.getInput('api_host') || 'https://cloud.datarecce.io';
   const webHost = core.getInput('web_host') || 'https://cloud.datarecce.io';
   const baseBranch = core.getInput('base_branch') || 'main';
+  const enableAiSummary = core.getInput('enable_ai_summary') || 'false';
   const githubToken = process.env.GITHUB_TOKEN || core.getInput('github_token');
 
   if (!githubToken) {
@@ -305,6 +310,7 @@ function getInputs(): ActionInputs {
     api_host: apiHost,
     web_host: webHost,
     base_branch: baseBranch,
+    enable_ai_summary: enableAiSummary,
     github_token: githubToken
   };
 }

@@ -11,6 +11,7 @@ export interface ActionInputs {
   web_host: string;
   github_token: string;
   base_branch: string;
+  enable_ai_summary: string;
 }
 
 /**
@@ -54,6 +55,7 @@ export interface TouchSessionResponse {
  */
 export interface UploadCompletedRequest {
   session_id: string;
+  enable_ai_summary?: boolean;
 }
 
 /**

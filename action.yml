@@ -19,6 +19,11 @@ inputs:
     required: false
     default: 'main'
 
+  enable_ai_summary:
+    description: 'Enable AI-powered summary generation (true/false).'
+    required: false
+    default: 'false'
+
   api_host:
     description: 'The Recce Cloud API host URL.'
     required: false
