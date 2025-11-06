@@ -27,7 +27,7 @@ async function verifyDbtManifestFiles(dbtTargetPath: string): Promise<void> {
 
   try {
     await fs.access(manifestPath);
-  } catch (error) {
+  } catch (_error) {
     const errorMsg = `[Error] DBT manifest.json file not found in ${dbtTargetPath} directory.`;
     core.error(errorMsg);
     await core.summary
@@ -41,7 +41,7 @@ async function verifyDbtManifestFiles(dbtTargetPath: string): Promise<void> {
 
   try {
     await fs.access(catalogPath);
-  } catch (error) {
+  } catch (_error) {
     const errorMsg = `[Error] DBT catalog.json file not found in ${dbtTargetPath} directory.`;
     core.error(errorMsg);
     await core.summary
