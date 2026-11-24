@@ -210,7 +210,7 @@ If your DBT project uses a custom target directory:
 
 Need help? We're here for you!
 
-- 💬 **Discord**: Join our community at https://discord.com/invite/VpwXRC34jz
+- 💬 **Discord**: Join our community at https://discord.gg/DnmXC4ehsy
 - 📧 **Email**: dev@reccehq.com
 - � **Issues**: Report bugs at https://github.com/DataRecce/recce-cloud-cicd-action/issues
 - 📖 **Documentation**: https://docs.reccehq.com
